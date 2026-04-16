@@ -1,82 +1,104 @@
-const fs = require("fs");
+const contenedor = document.getElementById("productos");
+const buscador = document.getElementById("buscador");
 
-const p1 = require("./productos.json");   // proveedor Magic
-const p2 = require("./productos2.json");  // JOYA manual
+let productos = [];
+let filtroActual = "todos"; // perfumes | bodysplash | todos
 
-const GANANCIA = 20000;
+fetch("/productos.json")
+  .then(res => res.json())
+  .then(data => {
+    productos = data;
+    renderProductos(productos);
+  });
 
-function limpiarNombre(nombre) {
-  return nombre
-    .toLowerCase()
-    .replace(/\d+ml/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+function crearMenu() {
+  const menu = document.createElement("div");
+  menu.style.display = "flex";
+  menu.style.justifyContent = "center";
+  menu.style.gap = "10px";
+  menu.style.margin = "20px";
+
+  const btnTodos = crearBoton("Todos", "todos");
+  const btnPerfumes = crearBoton("Perfumes", "perfume");
+  const btnBody = crearBoton("Body Splash", "body");
+
+  menu.appendChild(btnTodos);
+  menu.appendChild(btnPerfumes);
+  menu.appendChild(btnBody);
+
+  contenedor.parentNode.insertBefore(menu, contenedor);
 }
 
-const mapa = new Map();
+function crearBoton(texto, filtro) {
+  const btn = document.createElement("button");
+  btn.innerText = texto;
 
-// 👉 proveedor 1
-p1.forEach(p => {
-  const key = limpiarNombre(p.nombre);
+  btn.style.padding = "10px 15px";
+  btn.style.border = "none";
+  btn.style.borderRadius = "8px";
+  btn.style.cursor = "pointer";
+  btn.style.background = "#222";
+  btn.style.color = "#fff";
 
-  mapa.set(key, {
-    nombre: p.nombre,
-    precio: p.precio, // ya viene con ganancia
-    imagen: p.imagen
-  });
-});
+  btn.onclick = () => {
+    filtroActual = filtro;
+    aplicarFiltros();
+  };
 
-// 👉 JOYA (ahora sin ganancia)
-p2.forEach(p => {
-  const key = limpiarNombre(p.nombre);
+  return btn;
+}
 
-  const precioConGanancia = (p.precio || 0) + GANANCIA;
+function aplicarFiltros() {
+  let filtrados = productos;
 
-  if (mapa.has(key)) {
-    const existente = mapa.get(key);
-
-    if (precioConGanancia < existente.precio) {
-      mapa.set(key, {
-        nombre: existente.nombre,
-        precio: precioConGanancia,
-        imagen: existente.imagen
-      });
-    }
-  } else {
-    mapa.set(key, {
-      nombre: p.nombre,
-      precio: precioConGanancia,
-      imagen: p.imagen || "https://via.placeholder.com/300x300?text=Perfume"
-    });
+  // filtro por categoría
+  if (filtroActual === "perfume") {
+    filtrados = filtrados.filter(p =>
+      p.nombre.toLowerCase().includes("perfume")
+    );
   }
-});
 
-// 👉 filtros
-let productos = Array.from(mapa.values());
+  if (filtroActual === "body") {
+    filtrados = filtrados.filter(p =>
+      p.nombre.toLowerCase().includes("body splash")
+    );
+  }
 
-productos = productos.filter(p => {
-  const n = p.nombre.toLowerCase();
+  // filtro por búsqueda
+  const texto = buscador.value.toLowerCase();
+  filtrados = filtrados.filter(p =>
+    p.nombre.toLowerCase().includes(texto)
+  );
 
-if (
-  n.includes("kit") ||
-  n.includes("crema") ||
-  n.includes("perfumero") ||
-  n.includes("beauty") ||
-  n.includes("diviloo") ||
-  n.includes("luca") ||
-  n.includes("mystical") ||
-  n.includes("v.v. love") ||
-  n.includes("vv love")
-) return false;
+  renderProductos(filtrados);
+}
 
-  if (
-    !n.includes("perfume") &&
-    !n.includes("body splash")
-  ) return false;
+buscador.addEventListener("input", aplicarFiltros);
 
-  return true;
-});
+function renderProductos(lista) {
+  contenedor.innerHTML = "";
 
-fs.writeFileSync("productos_final.json", JSON.stringify(productos, null, 2));
+  lista.forEach(p => {
+    const card = document.createElement("div");
+    card.className = "card";
 
-console.log("Productos finales PRO:", productos.length);
+    card.innerHTML = `
+      <img src="${p.imagen}" />
+      <h3>${p.nombre}</h3>
+      <p>$${p.precio}</p>
+      <button onclick="comprar('${p.nombre}')">Comprar</button>
+    `;
+
+    contenedor.appendChild(card);
+  });
+}
+
+// función de compra (si ya la tenías, dejala igual)
+function comprar(nombre) {
+  const mensaje = `Hola, quiero comprar: ${nombre}`;
+  const url = `https://wa.me/TUNUMERO?text=${encodeURIComponent(mensaje)}`;
+  window.open(url, "_blank");
+}
+
+// crear menú al iniciar
+crearMenu();

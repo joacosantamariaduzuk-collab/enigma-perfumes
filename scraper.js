@@ -5,10 +5,45 @@ const fs = require("fs");
 const BASE_URL = "https://www.magicgirl.com.ar/perfumeria/page/";
 const GANANCIA = 20000;
 
+// ❌ LISTA NEGRA EXACTA
+const BLOQUEADOS_EXACTOS = [
+  "PERFUME XERJOFF OPERA",
+  "U PERFUMER COLOR",
+  "PERFUME ASAD A",
+  "U PERFUME YARA CANDY L",
+  "U PERFUME YARA MOI L",
+  "U PERFUME ASAD NEGRO B",
+  "PERFUME CLUB CARNIVAL INTENSE WOMEN NOL",
+  "U PERFUME YARA TOUS B",
+  "U PERFUME YARA TOUS L",
+  "U PERFUME AMEERAT AL ARAB B",
+  "U PERFUME LATTAFA ASAD NEGRO L",
+  "U PERFUME KHAMRAH B",
+  "U PERFUME LATTAFA ASAD AZUL L"
+];
+
+// ✅ EXCEPCIONES PERMITIDAS
+const PERMITIDOS_U = [
+  "U PERFUME ZAAFARAN MGB",
+  "U PERFUME AMEER AL OUDH INTENSE OUD",
+  "U PERFUME AJWAD LATTAFA"
+];
+
 function limpiarNombre(nombre) {
   return nombre
-    .replace(/AF\d+\/AF\d+/g, "")
-    .replace(/\d{3,}/g, "")
+    // eliminar códigos tipo AA--11, MG-123, etc
+    .replace(/\b[A-Z]{2,}[-–—]?\d+\b/g, "")
+
+    // eliminar caracteres raros (chinos, símbolos, etc)
+    .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ]/g, "")
+
+    // eliminar números
+    .replace(/\d+/g, "")
+
+    // eliminar ML
+    .replace(/\bML\b/gi, "")
+
+    // espacios
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -32,8 +67,27 @@ async function scrapear() {
         const json = JSON.parse($(el).html());
 
         if (json["@type"] === "Product") {
-          let nombre = limpiarNombre(json.name || "");
+          let nombreOriginal = (json.name || "").trim();
+          let nombre = limpiarNombre(nombreOriginal);
           let nombreLower = nombre.toLowerCase();
+
+          // ❌ eliminar exactos
+          if (BLOQUEADOS_EXACTOS.includes(nombreOriginal.trim())) {
+            return;
+          }
+
+          // ❌ eliminar "tubo"
+          if (nombreLower.includes("tubo")) {
+            return;
+          }
+
+          // ❌ eliminar todos los U PERFUME excepto permitidos
+          if (
+            nombreOriginal.startsWith("U PERFUME") &&
+            !PERMITIDOS_U.includes(nombreOriginal.trim())
+          ) {
+            return;
+          }
 
           let precioBase = 0;
 
@@ -48,7 +102,7 @@ async function scrapear() {
 
           if (!precioBase) return;
 
-          // ❌ SOLO perfumes y body splash
+          // ❌ SOLO perfumes
           if (
             !nombreLower.includes("perfume") &&
             !nombreLower.includes("body splash")
@@ -64,15 +118,9 @@ async function scrapear() {
             nombreLower.includes("perfumero") ||
             nombreLower.includes("macaron") ||
             nombreLower.includes("v.v.love") ||
-            nombreLower.includes("10ml") ||
-            nombreLower.includes("35ml") ||
-            nombreLower.includes("50ml") ||
             nombreLower.includes("beauty") ||
             nombreLower.includes("diviloo") ||
-            nombreLower.includes("luca") ||
-            nombreLower.includes("asad ml a aa") ||
-            nombreLower.includes("vip men are you on the list") ||
-            nombreLower.includes("xerjoff opera ml ab-1 12")
+            nombreLower.includes("luca")
           ) {
             return;
           }
@@ -81,7 +129,7 @@ async function scrapear() {
           let precioFinal;
 
           if (nombreLower.includes("xerjoff")) {
-            precioFinal = 350000; // precio fijo
+            precioFinal = 350000;
           } else {
             precioFinal = precioBase + GANANCIA;
           }

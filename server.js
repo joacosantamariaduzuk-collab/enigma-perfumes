@@ -31,6 +31,24 @@ app.get("/", (req, res) => {
         border: none;
       }
 
+      .menu {
+        margin: 15px;
+      }
+
+      .menu button {
+        padding: 10px 15px;
+        margin: 5px;
+        border: none;
+        border-radius: 8px;
+        background: #222;
+        color: white;
+        cursor: pointer;
+      }
+
+      .menu button:hover {
+        background: #444;
+      }
+
       .grid {
         display: flex;
         flex-wrap: wrap;
@@ -72,6 +90,12 @@ app.get("/", (req, res) => {
 
   <input type="text" id="buscador" placeholder="Buscar perfume...">
 
+  <div class="menu">
+    <button onclick="filtrar('todos')">Todos</button>
+    <button onclick="filtrar('perfume')">Perfumes</button>
+    <button onclick="filtrar('body')">Body Splash</button>
+  </div>
+
   <div class="grid">
   `;
 
@@ -93,15 +117,38 @@ app.get("/", (req, res) => {
 
   <script>
     const input = document.getElementById("buscador");
+    let filtroActual = "todos";
 
-    input.addEventListener("input", () => {
+    function filtrar(tipo) {
+      filtroActual = tipo;
+      aplicarFiltros();
+    }
+
+    input.addEventListener("input", aplicarFiltros);
+
+    function aplicarFiltros() {
       const texto = input.value.toLowerCase();
 
       document.querySelectorAll(".card").forEach((prod) => {
         const nombre = prod.querySelector(".nombre").textContent.toLowerCase();
-        prod.style.display = nombre.includes(texto) ? "block" : "none";
+
+        let visible = true;
+
+        // filtro por texto
+        if (!nombre.includes(texto)) visible = false;
+
+        // filtro por categoría
+        if (filtroActual === "perfume" && !nombre.includes("perfume")) {
+          visible = false;
+        }
+
+        if (filtroActual === "body" && !nombre.includes("body splash")) {
+          visible = false;
+        }
+
+        prod.style.display = visible ? "block" : "none";
       });
-    });
+    }
   </script>
 
   </body>
