@@ -4,42 +4,45 @@ const fs = require("fs");
 
 const productosManual = require("./joya_manual.json");
 
+const GANANCIA = 20000;
+
+function detectarCategoria(nombre) {
+  const n = nombre.toLowerCase();
+  if (n.includes("body")) return "body";
+  return "perfume";
+}
+
 async function scrapear() {
   let productos = [];
 
   for (const item of productosManual) {
     try {
-      console.log("Procesando:", item.url);
+      console.log("Joyita:", item.url);
 
       const { data } = await axios.get(item.url);
       const $ = cheerio.load(data);
 
-      // 🧠 nombre
       const nombre = $("h1").first().text().trim();
 
-      // 🖼️ imagen (mejorado)
       let imagen =
         $('meta[property="og:image"]').attr("content") ||
-        $("img").first().attr("src") ||
-        null;
-
-      // 💰 precio = SOLO costo
-      const precio = item.costo;
+        $("img").first().attr("src");
 
       productos.push({
         nombre,
-        precio,
-        imagen
+        precio: item.costo + GANANCIA,
+        imagen,
+        categoria: detectarCategoria(nombre)
       });
 
     } catch (err) {
-      console.log("❌ Error con:", item.url);
+      console.log("❌ Error:", item.url);
     }
   }
 
-  fs.writeFileSync("productos2.json", JSON.stringify(productos, null, 2));
+  fs.writeFileSync("productos_joya.json", JSON.stringify(productos, null, 2));
 
-  console.log("Productos JOYA manual:", productos.length);
+  console.log("🔥 Joyita:", productos.length);
 }
 
 scrapear();

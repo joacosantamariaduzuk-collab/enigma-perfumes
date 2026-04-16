@@ -17,36 +17,21 @@ app.get("/", (req, res) => {
         text-align: center;
       }
 
-      h1 {
-        margin: 20px;
-      }
-
       #buscador {
         width: 80%;
         max-width: 400px;
         padding: 10px;
-        margin-bottom: 20px;
-        font-size: 16px;
-        border-radius: 5px;
-        border: none;
-      }
-
-      .menu {
-        margin: 15px;
+        margin: 20px;
       }
 
       .menu button {
-        padding: 10px 15px;
+        padding: 10px;
         margin: 5px;
-        border: none;
-        border-radius: 8px;
         background: #222;
         color: white;
+        border: none;
+        border-radius: 8px;
         cursor: pointer;
-      }
-
-      .menu button:hover {
-        background: #444;
       }
 
       .grid {
@@ -57,38 +42,22 @@ app.get("/", (req, res) => {
 
       .card {
         background: #1e1e1e;
-        border-radius: 10px;
         margin: 10px;
         padding: 15px;
         width: 220px;
-      }
-
-      img {
-        width: 100%;
         border-radius: 10px;
       }
 
-      .precio {
-        font-size: 20px;
-        color: #00ff88;
-        margin: 10px 0;
-      }
+      img { width: 100%; border-radius: 10px; }
 
-      a {
-        display: inline-block;
-        padding: 8px 12px;
-        background: #25D366;
-        color: white;
-        text-decoration: none;
-        border-radius: 5px;
-      }
+      .precio { color: #00ff88; font-size: 20px; }
     </style>
   </head>
   <body>
 
   <h1>🔥 Enigma Perfumes 🔥</h1>
 
-  <input type="text" id="buscador" placeholder="Buscar perfume...">
+  <input id="buscador" placeholder="Buscar...">
 
   <div class="menu">
     <button onclick="filtrar('todos')">Todos</button>
@@ -103,8 +72,8 @@ app.get("/", (req, res) => {
     const link = "https://wa.me/541128450788?text=Hola quiero el " + p.nombre;
 
     html += `
-      <div class="card">
-        <img src="${p.imagen}" onerror="this.src='https://via.placeholder.com/300x300?text=Sin+Imagen'">
+      <div class="card" data-cat="${p.categoria}">
+        <img src="${p.imagen}">
         <p class="nombre">${p.nombre}</p>
         <div class="precio">$${p.precio}</div>
         <a href="${link}" target="_blank">Comprar</a>
@@ -116,37 +85,31 @@ app.get("/", (req, res) => {
   </div>
 
   <script>
-    const input = document.getElementById("buscador");
     let filtroActual = "todos";
 
     function filtrar(tipo) {
       filtroActual = tipo;
-      aplicarFiltros();
+      aplicar();
     }
 
-    input.addEventListener("input", aplicarFiltros);
+    document.getElementById("buscador").addEventListener("input", aplicar);
 
-    function aplicarFiltros() {
-      const texto = input.value.toLowerCase();
+    function aplicar() {
+      const texto = document.getElementById("buscador").value.toLowerCase();
 
-      document.querySelectorAll(".card").forEach((prod) => {
-        const nombre = prod.querySelector(".nombre").textContent.toLowerCase();
+      document.querySelectorAll(".card").forEach(card => {
+        const nombre = card.querySelector(".nombre").textContent.toLowerCase();
+        const cat = card.dataset.cat;
 
         let visible = true;
 
-        // filtro por texto
         if (!nombre.includes(texto)) visible = false;
 
-        // filtro por categoría
-        if (filtroActual === "perfume" && !nombre.includes("perfume")) {
+        if (filtroActual !== "todos" && cat !== filtroActual) {
           visible = false;
         }
 
-        if (filtroActual === "body" && !nombre.includes("body splash")) {
-          visible = false;
-        }
-
-        prod.style.display = visible ? "block" : "none";
+        card.style.display = visible ? "block" : "none";
       });
     }
   </script>
@@ -159,5 +122,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(3000, () => {
-  console.log("🚀 Web en http://localhost:3000");
+  console.log("🚀 http://localhost:3000");
 });

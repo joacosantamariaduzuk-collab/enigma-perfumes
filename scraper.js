@@ -5,47 +5,61 @@ const fs = require("fs");
 const BASE_URL = "https://www.magicgirl.com.ar/perfumeria/page/";
 const GANANCIA = 20000;
 
-// ❌ LISTA NEGRA EXACTA
-const BLOQUEADOS_EXACTOS = [
-  "PERFUME XERJOFF OPERA",
-  "U PERFUMER COLOR",
-  "PERFUME ASAD A",
-  "U PERFUME YARA CANDY L",
-  "U PERFUME YARA MOI L",
-  "U PERFUME ASAD NEGRO B",
-  "PERFUME CLUB CARNIVAL INTENSE WOMEN NOL",
-  "U PERFUME YARA TOUS B",
-  "U PERFUME YARA TOUS L",
-  "U PERFUME AMEERAT AL ARAB B",
-  "U PERFUME LATTAFA ASAD NEGRO L",
-  "U PERFUME KHAMRAH B",
-  "U PERFUME LATTAFA ASAD AZUL L"
+const BLOQUEADOS = [
+  "v.v.love","vv","love","tubo","only","onlyyou","onlyou","you",
+  "mini ro","perfumero","perfumer","luca","opera",
+  "mystical","diviloo","carnival"
 ];
 
-// ✅ EXCEPCIONES PERMITIDAS
+const BLOQUEADOS_EXACTOS = [
+  "PERFUME ASAD 100ML 7320A AA6923429173206"
+];
+
 const PERMITIDOS_U = [
-  "U PERFUME ZAAFARAN MGB",
-  "U PERFUME AMEER AL OUDH INTENSE OUD",
-  "U PERFUME AJWAD LATTAFA"
+  "ZAAFARAN",
+  "AMEER AL OUDH",
+  "AJWAD"
 ];
 
 function limpiarNombre(nombre) {
   return nombre
-    // eliminar códigos tipo AA--11, MG-123, etc
-    .replace(/\b[A-Z]{2,}[-–—]?\d+\b/g, "")
+    // eliminar ($15000/U)
+    .replace(/\(\$.*?\/U\)/gi, "")
 
-    // eliminar caracteres raros (chinos, símbolos, etc)
-    .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ]/g, "")
+    // eliminar caracteres raros
+    .replace(/[^\w\sáéíóúÁÉÍÓÚñÑ]/g, " ")
 
-    // eliminar números
-    .replace(/\d+/g, "")
+    // eliminar códigos tipo AB058-21, B811-2, etc
+    .replace(/\b[A-Z]+\d*-?\d+\b/g, "")
 
-    // eliminar ML
-    .replace(/\bML\b/gi, "")
+    // eliminar "NO 792" o similares
+    .replace(/\bNO\s*\d+\b/gi, "")
 
-    // espacios
+    // eliminar números largos
+    .replace(/\d{5,}/g, "")
+
+    // 🔥 eliminar números sueltos cortos (1-4 dígitos) que quedan
+    .replace(/\b\d{1,4}\b/g, "")
+
+    // limpiar espacios
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function esBasura(nombre) {
+  const n = nombre.toLowerCase();
+  return BLOQUEADOS.some(p => n.includes(p));
+}
+
+function esPermitidoU(nombre) {
+  return PERMITIDOS_U.some(p => nombre.toUpperCase().includes(p));
+}
+
+function detectarCategoria(nombre) {
+  const n = nombre.toLowerCase();
+  if (n.includes("body splash")) return "body";
+  if (n.includes("perfume")) return "perfume";
+  return null;
 }
 
 async function scrapear() {
@@ -65,95 +79,49 @@ async function scrapear() {
     $("script[type='application/ld+json']").each((i, el) => {
       try {
         const json = JSON.parse($(el).html());
+        if (json["@type"] !== "Product") return;
 
-        if (json["@type"] === "Product") {
-          let nombreOriginal = (json.name || "").trim();
-          let nombre = limpiarNombre(nombreOriginal);
-          let nombreLower = nombre.toLowerCase();
+        let nombreOriginal = (json.name || "").trim();
 
-          // ❌ eliminar exactos
-          if (BLOQUEADOS_EXACTOS.includes(nombreOriginal.trim())) {
-            return;
-          }
+        if (BLOQUEADOS_EXACTOS.includes(nombreOriginal)) return;
 
-          // ❌ eliminar "tubo"
-          if (nombreLower.includes("tubo")) {
-            return;
-          }
+        if (nombreOriginal.includes("/U") && !esPermitidoU(nombreOriginal)) return;
 
-          // ❌ eliminar todos los U PERFUME excepto permitidos
-          if (
-            nombreOriginal.startsWith("U PERFUME") &&
-            !PERMITIDOS_U.includes(nombreOriginal.trim())
-          ) {
-            return;
-          }
+        if (esBasura(nombreOriginal)) return;
 
-          let precioBase = 0;
+        const categoria = detectarCategoria(nombreOriginal);
+        if (!categoria) return;
 
-          if (json.offers && json.offers.price) {
-            precioBase = Number(json.offers.price);
-          } else {
-            const match = (json.description || "").match(/\$(\d[\d.,]+)/);
-            if (match) {
-              precioBase = Number(match[1].replace(/\./g, ""));
-            }
-          }
+        let precioBase = Number(json.offers?.price || 0);
+        if (!precioBase) return;
 
-          if (!precioBase) return;
+        let precioFinal =
+          nombreOriginal.toLowerCase().includes("xerjoff")
+            ? 350000
+            : precioBase + GANANCIA;
 
-          // ❌ SOLO perfumes
-          if (
-            !nombreLower.includes("perfume") &&
-            !nombreLower.includes("body splash")
-          ) {
-            return;
-          }
+        let nombre = limpiarNombre(nombreOriginal);
 
-          // ❌ FILTROS GENERALES
-          if (
-            nombreLower.includes("kit") ||
-            nombreLower.includes("crema") ||
-            nombreLower.includes("cream") ||
-            nombreLower.includes("perfumero") ||
-            nombreLower.includes("macaron") ||
-            nombreLower.includes("v.v.love") ||
-            nombreLower.includes("beauty") ||
-            nombreLower.includes("diviloo") ||
-            nombreLower.includes("luca")
-          ) {
-            return;
-          }
+        productos.push({
+          nombre,
+          precio: precioFinal,
+          imagen:
+            json.image ||
+            "https://via.placeholder.com/300x300?text=Perfume",
+          categoria
+        });
 
-          // 💰 PRECIO
-          let precioFinal;
-
-          if (nombreLower.includes("xerjoff")) {
-            precioFinal = 350000;
-          } else {
-            precioFinal = precioBase + GANANCIA;
-          }
-
-          productos.push({
-            nombre,
-            precio: precioFinal,
-            imagen:
-              json.image ||
-              `https://source.unsplash.com/300x300/?perfume`,
-          });
-        }
       } catch (e) {}
     });
   }
 
-  // eliminar duplicados
   const unicos = Array.from(
-    new Map(productos.map((p) => [p.nombre, p])).values()
+    new Map(productos.map(p => [p.nombre, p])).values()
   );
 
   fs.writeFileSync("productos.json", JSON.stringify(unicos, null, 2));
 
-  console.log("Productos finales:", unicos.length);
+  console.log("🔥 Productos finales:", unicos.length);
 }
 
 scrapear();
